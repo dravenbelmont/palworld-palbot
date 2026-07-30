@@ -30,17 +30,21 @@ ENV_EOF
 
 echo ".env file generated successfully."
 
-# 2. Initialize all required database tables using standard SQLite
-echo "Initializing database tables..."
+# 2. Initialize database tables using the exact DATABASE_PATH from the app's code
+echo "Initializing database tables using app's DATABASE_PATH..."
 python3 -c "
-import sqlite3, os
-
-paths = ['/app/database.db', '/app/src/database.db', 'database.db', 'src/database.db']
-for path in paths:
-    dir_name = os.path.dirname(path)
-    if dir_name:
-        os.makedirs(dir_name, exist_ok=True)
-    conn = sqlite3.connect(path)
+import sys
+sys.path.append('/app')
+try:
+    from src.utils.database import DATABASE_PATH
+    import sqlite3, os
+    
+    print(f'Target database path from app: {DATABASE_PATH}')
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+        
+    conn = sqlite3.connect(DATABASE_PATH)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS servers (server_name TEXT PRIMARY KEY)''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
@@ -49,8 +53,9 @@ for path in paths:
     cursor.execute('''CREATE TABLE IF NOT EXISTS players (steam_id TEXT, player_uid TEXT, name TEXT, server_name TEXT)''')
     conn.commit()
     conn.close()
-
-print('Database tables created successfully.')
+    print('Database tables created successfully at exact app path.')
+except Exception as e:
+    print(f'Error initializing database: {e}')
 "
 
 # 3. Start a lightweight background HTTP server to satisfy Render's port-binding health check
