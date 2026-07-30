@@ -1,7 +1,3 @@
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
 import nextcord
 import asyncio
 from utils.database import db
@@ -18,11 +14,11 @@ async def force_init_db():
 asyncio.run(force_init_db())
 
 from nextcord.ext import commands
-import src.utils.settings as settings
+import utils.settings as settings
 import os
-from src.utils.translations import translator
-from src.utils.errorhandling import handle_errors, setup_logging
-import src.utils.constants as constants
+from utils.translations import translator
+from utils.errorhandling import handle_errors, setup_logging
+import utils.constants as constants
 
 setup_logging()
 
@@ -61,5 +57,6 @@ async def ping(ctx):
 
 settings.load_cogs(bot)
 
-def start_palbot():
+# Start the bot natively
+if __name__ == "__main__":
     bot.run(settings.bot_token)
