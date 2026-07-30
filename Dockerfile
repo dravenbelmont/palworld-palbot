@@ -30,31 +30,26 @@ ENV_EOF
 
 echo ".env file generated successfully."
 
-# 2. Ensure database tables exist by running an initialization check
+# 2. Initialize database tables across all potential paths
 echo "Initializing database tables..."
 python3 -c "
-import asyncio, os, sqlite3, sys
-sys.path.append('/app')
+import sqlite3, os
 
-# Find sqlite database file or create default
-db_path = 'database.db'
-for root, dirs, files in os.walk('/app'):
-    for file in files:
-        if file.endswith('.db'):
-            db_path = os.path.join(root, file)
+paths = ['/app/database.db', '/app/src/database.db', 'database.db', 'src/database.db']
+for path in paths:
+    dir_name = os.path.dirname(path)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    conn = sqlite3.connect(path)
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS servers (server_name TEXT PRIMARY KEY)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)''')
+    cursor.execute('''CREATE TABLE IF NOT EXISTS cooldowns (user_id TEXT, action TEXT, expires_at TIMESTAMP)''')
+    conn.commit()
+    conn.close()
 
-conn = sqlite3.connect(db_path)
-cursor = conn.cursor()
-
-# Create required tables if they don't exist
-cursor.execute('''CREATE TABLE IF NOT EXISTS servers (server_name TEXT PRIMARY KEY)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)''')
-cursor.execute('''CREATE TABLE IF NOT EXISTS cooldowns (user_id TEXT, action TEXT, expires_at TIMESTAMP)''')
-
-conn.commit()
-conn.close()
-print('Database tables verified/created successfully.')
+print('Database tables created/verified successfully across all paths.')
 "
 
 # 3. Start a lightweight background HTTP server to satisfy Render's port-binding health check
