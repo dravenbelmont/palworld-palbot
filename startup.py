@@ -5,15 +5,22 @@ import sys
 from dotenv import load_dotenv
 
 print("--------------------------------------------------------")
-print("Starting Palbot container setup & auto-patching...")
+print("Starting Palbot container setup & configuration fix...")
 
 env_path = pathlib.Path("/app/.env")
 
-# Pull core configuration
+# Core configurations
 bot_token = os.getenv("BOT_TOKEN", "")
 bot_prefix = os.getenv("BOT_PREFIX", "!")
 bot_activity = os.getenv("BOT_ACTIVITY", "Palworld")
 bot_language = os.getenv("BOT_LANGUAGE", "en")
+
+# Capture Application ID / Client ID to fix the 'None' API spam error
+application_id = (
+    os.getenv("APPLICATION_ID")
+    or os.getenv("CLIENT_ID")
+    or os.getenv("DISCORD_CLIENT_ID", "1532027695914025222")
+)
 
 # Catch-all environment variables for chat and webhooks
 chat_channel = (
@@ -37,8 +44,11 @@ server_ip = os.getenv("SERVER_IP", "")
 rcon_port = os.getenv("RCON_PORT", "25575")
 rcon_password = os.getenv("RCON_PASSWORD", "")
 
-# Write comprehensive .env containing every possible key name variant
+# Write comprehensive .env containing every key name variant including Application ID
 env_content = f"""BOT_TOKEN={bot_token}
+APPLICATION_ID={application_id}
+CLIENT_ID={application_id}
+DISCORD_CLIENT_ID={application_id}
 BOT_PREFIX={bot_prefix}
 BOT_ACTIVITY={bot_activity}
 BOT_LANGUAGE={bot_language}
@@ -58,28 +68,7 @@ RCON_PASSWORD={rcon_password}
 env_path.write_text(env_content)
 load_dotenv(env_path, override=True)
 
-# Auto-patcher to locate and silence the strict chatlog/webhook startup errors in source files
-src_dir = pathlib.Path("/app/src")
-if not src_dir.exists():
-    src_dir = pathlib.Path("src")
-
-if src_dir.exists():
-    for py_file in src_dir.glob("**/*.py"):
-        try:
-            content = py_file.read_text(encoding="utf-8")
-            modified = False
-            
-            # Neutralize strict checks that exit or error out on missing chat log/webhook strings
-            if "Chat log channel env variable not set" in content or "Chatlog path or webhook URL not set" in content:
-                # Replace strict error logging with pass/warnings so it doesn't block execution
-                content = content.replace("ERROR:root:Chat log channel env variable not set", "WARNING:root:Chat log channel bypassed")
-                content = content.replace("ERROR:root:Chatlog path or webhook URL not set", "WARNING:root:Chatlog path bypassed")
-                py_file.write_text(content, encoding="utf-8")
-                print(f"Patched validation checks in {py_file.name}")
-        except Exception as e:
-            pass
-
-print(".env generated, loaded, and source files patched successfully.")
+print(".env generated and loaded with Application ID successfully.")
 print("--------------------------------------------------------")
 
 # Launch the main application
