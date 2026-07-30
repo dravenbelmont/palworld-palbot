@@ -11,27 +11,32 @@ RUN git clone https://github.com/dkoz/palworld-palbot .
 # Install the required Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Append the dummy HTTP server and .env generator safely via EOF block
-RUN cat << 'EOF' >> src/main.py
+# Create a robust runtime startup script
+RUN cat << 'EOF' > /app/start.sh
+#!/bin/sh
 
-import http.server
-import threading
-import os
+# 1. Generate the .env file from Render runtime environment variables first
+cat << ENV_EOF > /app/.env
+DISCORD_TOKEN="$DISCORD_TOKEN"
+WEBHOOK_URL="$WEBHOOK_URL"
+CHAT_CHANNEL_ID="$CHAT_CHANNEL_ID"
+CHAT_LOG_CHANNEL_ID="$CHAT_LOG_CHANNEL_ID"
+ENV_EOF
 
-def run_dotenv_and_server():
-    with open('/app/.env', 'w') as f:
-        for k in ['DISCORD_TOKEN', 'WEBHOOK_URL', 'CHAT_CHANNEL_ID', 'CHAT_LOG_CHANNEL_ID']:
-            v = os.environ.get(k)
-            if v:
-                f.write(f"{k}={v}\n")
-                
-    port = int(os.environ.get('PORT', 10000))
-    httpd = http.server.HTTPServer(('', port), http.server.SimpleHTTPRequestHandler)
-    httpd.serve_forever()
+# 2. Start a background dummy HTTP server to satisfy Render's port-binding requirement
+python -c "
+import http.server, os
+port = int(os.environ.get('PORT', 10000))
+server = http.server.HTTPServer(('', port), http.server.SimpleHTTPRequestHandler)
+server.serve_forever()
+" &
 
-threading.Thread(target=run_dotenv_and_server, daemon=False).start()
+# 3. Execute the bot application
+exec python src/main.py
 EOF
+
+RUN chmod +x /app/start.sh
 
 ENV PYTHONPATH=/app
 
-CMD ["python", "src/main.py"]
+CMD ["/app/start.sh"]
