@@ -11,29 +11,7 @@ RUN git clone https://github.com/dkoz/palworld-palbot .
 # Install Python requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create an error-catching runner script to expose hidden tracebacks
-RUN cat << 'EOF' > /app/run_bot.py
-import sys
-import traceback
-import os
-
-print("Loading environment variables...")
-from dotenv import load_dotenv
-load_dotenv()
-
-print("Attempting to start Palbot...")
-try:
-    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
-    import main
-except Exception as e:
-    print("=" * 60)
-    print("CRITICAL ERROR: Palbot crashed with an exception!")
-    traceback.print_exc()
-    print("=" * 60)
-    sys.exit(1)
-EOF
-
-# Create the startup wrapper script
+# Create the Render wrapper script
 RUN cat << 'EOF' > /app/start.sh
 #!/bin/sh
 set -e
@@ -41,7 +19,7 @@ set -e
 echo "--------------------------------------------------------"
 echo "Starting Palbot container setup..."
 
-# 1. Write environment variables to the .env file expected by the bot
+# 1. Write environment variables to the .env file expected by startup.py
 cat << ENV_EOF > /app/.env
 DISCORD_TOKEN="$DISCORD_TOKEN"
 WEBHOOK_URL="$WEBHOOK_URL"
@@ -51,7 +29,7 @@ ENV_EOF
 
 echo ".env file generated successfully."
 
-# 2. Start a background HTTP server to satisfy Render's port-binding health check
+# 2. Start a lightweight background HTTP server to satisfy Render's port-binding health check
 python3 -c "
 import http.server, os
 port = int(os.environ.get('PORT', 10000))
@@ -59,11 +37,11 @@ server = http.server.HTTPServer(('', port), http.server.SimpleHTTPRequestHandler
 server.serve_forever()
 " &
 
-echo "Launching Palbot with error tracking..."
+echo "Launching Palbot application via native startup.py..."
 echo "--------------------------------------------------------"
 
-# 3. Run the error-catching wrapper script in the foreground
-exec python -u /app/run_bot.py
+# 3. Execute the official repository startup script
+exec python -u startup.py
 EOF
 
 RUN chmod +x /app/start.sh
