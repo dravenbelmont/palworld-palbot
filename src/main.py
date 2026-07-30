@@ -1,4 +1,19 @@
 import nextcord
+import asyncio
+import os
+from utils.database import db
+
+async def force_init_db():
+    try:
+        await db.execute("CREATE TABLE IF NOT EXISTS servers (server_name TEXT, ip TEXT, port INTEGER, password TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT, setting_value TEXT)")
+        await db.execute("CREATE TABLE IF NOT EXISTS cooldowns (expires_at TEXT)")
+        await db.commit()
+    except Exception as e:
+        print(f"Database generation pass: {e}")
+
+asyncio.run(force_init_db())
+
 from nextcord.ext import commands
 import src.utils.settings as settings
 import os
