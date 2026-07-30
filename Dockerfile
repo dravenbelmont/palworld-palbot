@@ -19,9 +19,10 @@ set -e
 echo "--------------------------------------------------------"
 echo "Starting Palbot container setup..."
 
-# 1. Write environment variables to the .env file expected by startup.py
+# 1. Write environment variables to the .env file, covering both common naming conventions
 cat << ENV_EOF > /app/.env
 DISCORD_TOKEN="$DISCORD_TOKEN"
+BOT_TOKEN="$DISCORD_TOKEN"
 WEBHOOK_URL="$WEBHOOK_URL"
 CHAT_CHANNEL_ID="$CHAT_CHANNEL_ID"
 CHAT_LOG_CHANNEL_ID="$CHAT_LOG_CHANNEL_ID"
