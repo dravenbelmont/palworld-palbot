@@ -11,6 +11,28 @@ RUN git clone https://github.com/dkoz/palworld-palbot .
 # Install Python requirements
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Create an error-catching runner script to expose hidden tracebacks
+RUN cat << 'EOF' > /app/run_bot.py
+import sys
+import traceback
+import os
+
+print("Loading environment variables...")
+from dotenv import load_dotenv
+load_dotenv()
+
+print("Attempting to start Palbot...")
+try:
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), 'src')))
+    import main
+except Exception as e:
+    print("=" * 60)
+    print("CRITICAL ERROR: Palbot crashed with an exception!")
+    traceback.print_exc()
+    print("=" * 60)
+    sys.exit(1)
+EOF
+
 # Create the startup wrapper script
 RUN cat << 'EOF' > /app/start.sh
 #!/bin/sh
@@ -37,11 +59,11 @@ server = http.server.HTTPServer(('', port), http.server.SimpleHTTPRequestHandler
 server.serve_forever()
 " &
 
-echo "Launching Palbot application..."
+echo "Launching Palbot with error tracking..."
 echo "--------------------------------------------------------"
 
-# 3. Start the bot application in the foreground so it keeps the container running
-exec python -u src/main.py
+# 3. Run the error-catching wrapper script in the foreground
+exec python -u /app/run_bot.py
 EOF
 
 RUN chmod +x /app/start.sh
