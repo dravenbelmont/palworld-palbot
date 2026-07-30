@@ -1,6 +1,6 @@
 import nextcord
 import asyncio
-from src.utils.database import db
+from utils.database import db
 
 async def force_init_db():
     try:
@@ -14,11 +14,11 @@ async def force_init_db():
 asyncio.run(force_init_db())
 
 from nextcord.ext import commands
-import src.utils.settings as settings
+import utils.settings as settings
 import os
-from src.utils.translations import translator
-from src.utils.errorhandling import handle_errors, setup_logging
-import src.utils.constants as constants
+from utils.translations import translator
+from utils.errorhandling import handle_errors, setup_logging
+import utils.constants as constants
 
 setup_logging()
 
@@ -57,9 +57,5 @@ async def ping(ctx):
 
 settings.load_cogs(bot)
 
-# This is what startup.py relies on to ignite the bot connection
-def start_palbot():
-    bot.run(settings.bot_token)
-
 if __name__ == "__main__":
-    start_palbot()
+    bot.run(settings.bot_token)
