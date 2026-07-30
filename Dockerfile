@@ -19,7 +19,7 @@ set -e
 echo "--------------------------------------------------------"
 echo "Starting Palbot container setup..."
 
-# 1. Write environment variables to the .env file, covering both common naming conventions
+# 1. Write environment variables to the .env file
 cat << ENV_EOF > /app/.env
 DISCORD_TOKEN="$DISCORD_TOKEN"
 BOT_TOKEN="$DISCORD_TOKEN"
@@ -30,7 +30,34 @@ ENV_EOF
 
 echo ".env file generated successfully."
 
-# 2. Start a lightweight background HTTP server to satisfy Render's port-binding health check
+# 2. Ensure database tables exist by running an initialization check
+echo "Initializing database tables..."
+python3 -c "
+import asyncio, os, sqlite3, sys
+sys.path.append('/app')
+
+# Find sqlite database file or create default
+db_path = 'database.db'
+for root, dirs, files in os.walk('/app'):
+    for file in files:
+        if file.endswith('.db'):
+            db_path = os.path.join(root, file)
+
+conn = sqlite3.connect(db_path)
+cursor = conn.cursor()
+
+# Create required tables if they don't exist
+cursor.execute('''CREATE TABLE IF NOT EXISTS servers (server_name TEXT PRIMARY KEY)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)''')
+cursor.execute('''CREATE TABLE IF NOT EXISTS cooldowns (user_id TEXT, action TEXT, expires_at TIMESTAMP)''')
+
+conn.commit()
+conn.close()
+print('Database tables verified/created successfully.')
+"
+
+# 3. Start a lightweight background HTTP server to satisfy Render's port-binding health check
 python3 -c "
 import http.server, os
 port = int(os.environ.get('PORT', 10000))
@@ -41,7 +68,7 @@ server.serve_forever()
 echo "Launching Palbot application via native startup.py..."
 echo "--------------------------------------------------------"
 
-# 3. Execute the official repository startup script
+# 4. Execute the official repository startup script
 exec python -u startup.py
 EOF
 
