@@ -11,16 +11,18 @@ RUN git clone https://github.com/dkoz/palworld-palbot .
 # Install the required Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create a robust runtime startup script with token validation
+# Create a robust runtime startup script with token validation and unbuffered logging
 RUN cat << 'EOF' > /app/start.sh
 #!/bin/sh
 
 echo "--------------------------------------------------------"
 echo "Starting Palbot container setup..."
 
-# Check if DISCORD_TOKEN is provided
-if [ -z "$DISCORD_TOKEN" ]; then
-    echo "ERROR: DISCORD_TOKEN is missing or empty! Please set it in your Render Environment variables."
+# Validate that DISCORD_TOKEN is provided and isn't a placeholder
+if [ -z "$DISCORD_TOKEN" ] || [ "$DISCORD_TOKEN" = "your_discord_bot_token_here" ]; then
+    echo "CRITICAL ERROR: DISCORD_TOKEN is missing, empty, or set to a placeholder!"
+    echo "Please configure a valid DISCORD_TOKEN in your Render Environment variables."
+    exit 1
 fi
 
 # 1. Generate the .env file from Render runtime environment variables
@@ -41,15 +43,16 @@ server = http.server.HTTPServer(('', port), http.server.SimpleHTTPRequestHandler
 server.serve_forever()
 " &
 
-echo "Starting Palbot application..."
+echo "Launching Palbot application..."
 echo "--------------------------------------------------------"
 
-# 3. Execute the bot application
-exec python src/main.py
+# 3. Execute the bot application with unbuffered python output to capture crashes
+exec python -u src/main.py
 EOF
 
 RUN chmod +x /app/start.sh
 
 ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
 
 CMD ["/app/start.sh"]
