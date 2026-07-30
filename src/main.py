@@ -1,7 +1,7 @@
 import nextcord
 import asyncio
 import os
-from src.utils.database import db
+from utils.database import db
 
 async def force_init_db():
     try:
