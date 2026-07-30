@@ -60,20 +60,18 @@ conn.close()
 print('Pre-seeded /app/data/palbot.db successfully.')
 "
 
-# 3. Patch src/utils/database.py and src/utils/kitutility.py to ensure absolute path and table creation
+# 3. Patch database.py and kitutility.py to enforce absolute path and ensure init_kitdb is called
 python3 -c "
 # Patch database.py
 db_path = '/app/src/utils/database.py'
 with open(db_path, 'r') as f:
     content = f.read()
-
 content = content.replace('DATABASE_PATH = \"data/palbot.db\"', 'DATABASE_PATH = \"/app/data/palbot.db\"')
 content = content.replace(\"DATABASE_PATH = 'data/palbot.db'\", \"DATABASE_PATH = '/app/data/palbot.db'\")
-
 with open(db_path, 'w') as f:
     f.write(content)
 
-# Patch kitutility.py to ensure kits table is always created and absolute path is used
+# Patch kitutility.py to ensure absolute path and auto-call init_kitdb before loading items
 kit_path = '/app/src/utils/kitutility.py'
 with open(kit_path, 'r') as f:
     kit_content = f.read()
@@ -81,14 +79,8 @@ with open(kit_path, 'r') as f:
 kit_content = kit_content.replace('DATABASE_PATH = \"data/palbot.db\"', 'DATABASE_PATH = \"/app/data/palbot.db\"')
 kit_content = kit_content.replace(\"DATABASE_PATH = 'data/palbot.db'\", \"DATABASE_PATH = '/app/data/palbot.db'\")
 
-target_str = 'async def init_kitdb():'
-replacement = '''async def init_kitdb():
-    async with aiosqlite.connect(DATABASE_PATH) as db:
-        await db.execute(\"CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)\")
-        await db.commit()'''
-
-if target_str in kit_content and 'CREATE TABLE IF NOT EXISTS kits' not in kit_content:
-    kit_content = kit_content.replace(target_str, replacement)
+if 'async def load_shop_items():' in kit_content and 'await init_kitdb()' not in kit_content:
+    kit_content = kit_content.replace('async def load_shop_items():', 'async def load_shop_items():\n    await init_kitdb()')
 
 with open(kit_path, 'w') as f:
     f.write(kit_content)
