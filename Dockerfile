@@ -30,7 +30,7 @@ ENV_EOF
 
 echo ".env file generated successfully."
 
-# 2. Force absolute database path and initialize/seed tables
+# 2. Pre-create and seed database at /app/data/palbot.db
 python3 -c "
 import os, sqlite3
 
@@ -40,14 +40,12 @@ os.makedirs(os.path.dirname(db_path), exist_ok=True)
 conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
-# Create all required tables
 cursor.execute('''CREATE TABLE IF NOT EXISTS servers (server_name TEXT PRIMARY KEY)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS economy_settings (setting_key TEXT PRIMARY KEY, setting_value TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS cooldowns (user_id TEXT, action TEXT, expires_at TIMESTAMP)''')
 cursor.execute('''CREATE TABLE IF NOT EXISTS players (steam_id TEXT, player_uid TEXT, name TEXT, server_name TEXT)''')
 
-# Seed default economy settings to prevent NoneType casting errors
 defaults = {
     'vote_reward': '10',
     'currency_name': 'points',
@@ -59,23 +57,43 @@ for k, v in defaults.items():
 
 conn.commit()
 conn.close()
-print('Absolute database path initialized and seeded successfully at:', db_path)
+print('Pre-seeded /app/data/palbot.db successfully.')
 "
 
-# 3. Patch src/utils/database.py to enforce absolute DATABASE_PATH and bulletproof get_economy_setting
+# 3. Patch src/utils/database.py and src/utils/kitutility.py to ensure absolute path and table creation
 python3 -c "
-db_utils_path = '/app/src/utils/database.py'
-with open(db_utils_path, 'r') as f:
-    code = f.read()
+# Patch database.py
+db_path = '/app/src/utils/database.py'
+with open(db_path, 'r') as f:
+    content = f.read()
 
-# Enforce absolute path
-code = code.replace('DATABASE_PATH = \"data/palbot.db\"', 'DATABASE_PATH = \"/app/data/palbot.db\"')
-code = code.replace(\"DATABASE_PATH = 'data/palbot.db'\", \"DATABASE_PATH = '/app/data/palbot.db'\")
+content = content.replace('DATABASE_PATH = \"data/palbot.db\"', 'DATABASE_PATH = \"/app/data/palbot.db\"')
+content = content.replace(\"DATABASE_PATH = 'data/palbot.db'\", \"DATABASE_PATH = '/app/data/palbot.db'\")
 
-with open(db_utils_path, 'w') as f:
-    f.write(code)
+with open(db_path, 'w') as f:
+    f.write(content)
 
-print('Patched database.py with absolute path.')
+# Patch kitutility.py to ensure kits table is always created and absolute path is used
+kit_path = '/app/src/utils/kitutility.py'
+with open(kit_path, 'r') as f:
+    kit_content = f.read()
+
+kit_content = kit_content.replace('DATABASE_PATH = \"data/palbot.db\"', 'DATABASE_PATH = \"/app/data/palbot.db\"')
+kit_content = kit_content.replace(\"DATABASE_PATH = 'data/palbot.db'\", \"DATABASE_PATH = '/app/data/palbot.db'\")
+
+target_str = 'async def init_kitdb():'
+replacement = '''async def init_kitdb():
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        await db.execute(\"CREATE TABLE IF NOT EXISTS kits (name TEXT PRIMARY KEY, description TEXT, price INTEGER, category TEXT)\")
+        await db.commit()'''
+
+if target_str in kit_content and 'CREATE TABLE IF NOT EXISTS kits' not in kit_content:
+    kit_content = kit_content.replace(target_str, replacement)
+
+with open(kit_path, 'w') as f:
+    f.write(kit_content)
+
+print('Successfully patched database.py and kitutility.py.')
 "
 
 # 4. Start a lightweight background HTTP server to satisfy Render's port-binding health check
